@@ -73,16 +73,6 @@ jobs:
 
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
-          # 변수 값 확인 (디버깅용)
-          echo "HEADER_TEXT=$HEADER_TEXT"
-          echo "HEADER_EMOJI=$HEADER_EMOJI"
-          echo "BUTTON_TEXT=$BUTTON_TEXT"
-          echo "APPROVER=$APPROVER"
-          echo "ASSIGNEE=$ASSIGNEE"
-          echo "PR_TITLE=$PR_TITLE"
-          echo "PR_LINK=$PR_LINK"
-          echo "BRANCH=$BRANCH"
-
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
