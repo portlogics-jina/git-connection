@@ -48,7 +48,7 @@ jobs:
       - name: Prepare Slack message using template
         run: |
           HEADER_TEXT="New PR Comment"
-          HEADER_EMOJI=":말풍선:"
+          HEADER_EMOJI=":speech_balloon:"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" # PR 작성자의 Slack ID
           SLACK_REVIEWERS="<@${COMMENTER_SLACK_ID}>" # 댓글 작성자의 Slack ID
