@@ -51,6 +51,7 @@ jobs:
           REVIEWER="${{ github.event.review.user.login }}"
           REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
+          fi
 
       - name: Get PR details
         if: steps.check_approval.outputs.approved == 'true'
