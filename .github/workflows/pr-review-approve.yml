@@ -70,7 +70,6 @@ jobs:
           BUTTON_TEXT="지금 당장 확인하기"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>" 
           ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" 
-
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
