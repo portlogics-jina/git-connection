@@ -1,4 +1,4 @@
-name: PR Approval Notifications
+name: PR Approval and Comment Notifications
 
 on:
   pull_request_review:
@@ -20,7 +20,7 @@ env:
     ]
 
 jobs:
-  notifyApproval:
+  notifyReview:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -31,17 +31,19 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Check if review is an approval
-        id: check_approval
+      - name: Check review state
+        id: check_review
         run: |
-          if [[ "${{ github.event.review.state }}" == "approved" ]]; then
-            echo "approved=true" >> $GITHUB_OUTPUT
-          else
-            echo "approved=false" >> $GITHUB_OUTPUT
+          REVIEW_STATE="${{ github.event.review.state }}"
+          echo "review_state=$REVIEW_STATE" >> $GITHUB_ENV
+          if [[ "$REVIEW_STATE" == "approved" ]]; then
+            echo "is_approval=true" >> $GITHUB_OUTPUT
+          elif [[ "$REVIEW_STATE" == "commented" ]]; then
+            echo "is_comment=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Get PR author and reviewer information
-        if: steps.check_approval.outputs.approved == 'true'
+        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           ASSIGNEE=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
           ASSIGNEE_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).slack_id')
@@ -52,25 +54,33 @@ jobs:
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
       - name: Get PR details
-        if: steps.check_approval.outputs.approved == 'true'
+        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
           BRANCH="${{ github.event.pull_request.head.ref }}"
           PR_LINK="${{ github.event.pull_request.html_url }}"
+          REVIEW_BODY="${{ github.event.review.body }}"
 
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
+          echo "REVIEW_BODY=$REVIEW_BODY" >> $GITHUB_ENV
 
-      - name: Prepare Slack message for approval
-        if: steps.check_approval.outputs.approved == 'true'
+      - name: Prepare Slack message
+        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
-          HEADER_TEXT="PR Approved"
-          HEADER_EMOJI=":white_check_mark:"
+          if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
+            HEADER_TEXT="PR Approved"
+            HEADER_EMOJI=":white_check_mark:"
+          elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
+            HEADER_TEXT="New PR Comment"
+            HEADER_EMOJI=":speech_balloon:"
+          fi
+          
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>" 
-          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -80,12 +90,14 @@ jobs:
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
+              --arg review_body "$REVIEW_BODY" \
               '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $approver) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link) |
+                .blocks[4].text.text |= sub("{{REVIEW_BODY}}"; $review_body)')
 
           curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
