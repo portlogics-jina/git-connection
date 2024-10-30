@@ -135,15 +135,6 @@ jobs:
   
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
-          echo "HEADER_TEXT=$HEADER_TEXT"
-          echo "HEADER_EMOJI=$HEADER_EMOJI"
-          echo "BUTTON_TEXT=$BUTTON_TEXT"
-          echo "ASSIGNEE=$ASSIGNEE"
-          echo "SLACK_REVIEWERS=$SLACK_REVIEWERS"
-          echo "PR_TITLE=$PR_TITLE"
-          echo "PR_LINK=$PR_LINK"
-          echo "TARGET_BRANCH=$TARGET_BRANCH"
-
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
@@ -159,7 +150,6 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
-
 
           curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} 
   
