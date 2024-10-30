@@ -1,0 +1,52 @@
+{
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*{{HEADER}}*"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*담당자:*\n{{ASSIGNEE}}"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*리뷰어:*\n{{SLACK_REVIEWERS}}"
+          }
+        ]
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*제목*:\n{{PR_TITLE}}"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*브랜치*:\n`{{BRANCH}}`"
+          }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "emoji": true,
+              "text": "{{BUTTON_TEXT}}"
+            },
+            "style": "primary",
+            "url": "{{PR_LINK}}"
+          }
+        ]
+      }
+    ]
+  }
