@@ -1,4 +1,4 @@
-name: Auto Pull Request Settings
+name: Auto PR Settings
 
 on:
   pull_request:
