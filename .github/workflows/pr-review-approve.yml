@@ -38,20 +38,18 @@ jobs:
             echo "approved=true" >> $GITHUB_OUTPUT
           else
             echo "approved=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Get PR author and reviewer information
         if: steps.check_approval.outputs.approved == 'true'
         run: |
-          # PR 작성자 정보 가져오기
           PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
           PR_AUTHOR_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg PR_AUTHOR "$PR_AUTHOR" '.[] | select(.github_username == $PR_AUTHOR).slack_id')
           echo "PR_AUTHOR_SLACK_ID=$PR_AUTHOR_SLACK_ID" >> $GITHUB_ENV
 
-          # 리뷰어 정보 가져오기
           REVIEWER="${{ github.event.review.user.login }}"
           REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
-          fi
 
       - name: Get PR details
         if: steps.check_approval.outputs.approved == 'true'
