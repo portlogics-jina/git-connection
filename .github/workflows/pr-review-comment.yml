@@ -58,9 +58,10 @@ jobs:
           HEADER_TEXT="New PR Comment"
           HEADER_EMOJI=":speech_balloon:"
           BUTTON_TEXT="지금 당장 확인하기"
-          ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" # PR 작성자의 Slack ID
-          SLACK_REVIEWERS="<@${COMMENTER_SLACK_ID}>" # 댓글 작성자의 Slack ID
+          ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" 
+          SLACK_REVIEWERS="<@${COMMENTER_SLACK_ID}>"
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+          
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
