@@ -161,5 +161,6 @@ jobs:
   
           echo "$SLACK_MESSAGE" | jq . 
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} --connect-timeout 5 --max-time 10
+          exit 0
   
