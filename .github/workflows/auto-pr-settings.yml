@@ -3,6 +3,7 @@ name: Auto PR Settings
 on:
   pull_request:
     types: [opened]
+
 permissions:
   contents: read
   pull-requests: write
@@ -22,7 +23,7 @@ env:
 
 jobs:
   updatePullRequest:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -158,9 +159,7 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
-  
-          echo "$SLACK_MESSAGE" | jq . 
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} --connect-timeout 5 --max-time 10
-          exit 0
+
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} 
   

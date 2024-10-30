@@ -1,0 +1,105 @@
+name: PR Approval Notifications
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  repository-projects: read
+  statuses: read
+  checks: read
+
+env:
+  ALL_REVIEWERS: |
+    [
+      {"github_username": "portlogics-jina", "slack_id": "U07TTV10212"},
+      {"github_username": "pja9362", "slack_id": "U07TGB567BR"}
+    ]
+
+jobs:
+  notifyApproval:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Check if review is an approval
+        id: check_approval
+        run: |
+          if [[ "${{ github.event.review.state }}" == "approved" ]]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            echo "approved=false" >> $GITHUB_OUTPUT
+
+      - name: Get PR author and reviewer information
+        if: steps.check_approval.outputs.approved == 'true'
+        run: |
+          # PR 작성자 정보 가져오기
+          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
+          PR_AUTHOR_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg PR_AUTHOR "$PR_AUTHOR" '.[] | select(.github_username == $PR_AUTHOR).slack_id')
+          echo "PR_AUTHOR_SLACK_ID=$PR_AUTHOR_SLACK_ID" >> $GITHUB_ENV
+
+          # 리뷰어 정보 가져오기
+          REVIEWER="${{ github.event.review.user.login }}"
+          REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
+          echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
+
+      - name: Get PR details
+        if: steps.check_approval.outputs.approved == 'true'
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          PR_LINK="${{ github.event.pull_request.html_url }}"
+
+          echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
+
+      - name: Prepare Slack message for approval
+        if: steps.check_approval.outputs.approved == 'true'
+        run: |
+          HEADER_TEXT="PR Approved"
+          HEADER_EMOJI=":white_check_mark:"
+          BUTTON_TEXT="PR 확인하기"
+          APPROVER="<@${REVIEWER_SLACK_ID}>" # 리뷰어의 Slack ID
+          ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" # PR 작성자의 Slack ID
+
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+
+          # 변수 값 확인 (디버깅용)
+          echo "HEADER_TEXT=$HEADER_TEXT"
+          echo "HEADER_EMOJI=$HEADER_EMOJI"
+          echo "BUTTON_TEXT=$BUTTON_TEXT"
+          echo "APPROVER=$APPROVER"
+          echo "ASSIGNEE=$ASSIGNEE"
+          echo "PR_TITLE=$PR_TITLE"
+          echo "PR_LINK=$PR_LINK"
+          echo "BRANCH=$BRANCH"
+
+          SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
+            jq --arg full_header "$FULL_HEADER" \
+              --arg button_text "$BUTTON_TEXT" \
+              --arg approver "$APPROVER" \
+              --arg assignee "$ASSIGNEE" \
+              --arg branch "$BRANCH" \
+              --arg pr_link "$PR_LINK" \
+              --arg pr_title "$PR_TITLE" \
+              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
+                .blocks[1].fields[0].text |= sub("{{APPROVER}}"; $approver) | 
+                .blocks[1].fields[1].text |= sub("{{ASSIGNEE}}"; $assignee) | 
+                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+
+          echo "$SLACK_MESSAGE" | jq .
+
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
