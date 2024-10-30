@@ -48,7 +48,7 @@ jobs:
       - name: Prepare Slack message using template
         run: |
           HEADER_TEXT="New PR Comment"
-          HEADER_EMOJI=":말풍선:"
+          HEADER_EMOJI=":speech_balloon:"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" # PR 작성자의 Slack ID
           SLACK_REVIEWERS="<@${COMMENTER_SLACK_ID}>" # 댓글 작성자의 Slack ID
@@ -68,4 +68,6 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} --connect-timeout 5 --max-time 10
+
+          exit 0
