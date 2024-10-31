@@ -112,7 +112,9 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
-      
+
+          echo "$COMMENT_MESSAGE"
+          
           curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
             -H 'Content-type: application/json' \
             --data "$COMMENT_MESSAGE" https://slack.com/api/chat.postMessage
