@@ -42,11 +42,15 @@ jobs:
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           ASSIGNEE=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
-          ASSIGNEE_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).slack_id')
+          ASSIGNEE_INFO=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE)')
+          ASSIGNEE_SLACK_ID=$(echo "$ASSIGNEE_INFO" | jq -r '.slack_id')
+          ASSIGNEE_DM_CHANNEL_ID=$(echo "$ASSIGNEE_INFO" | jq -r '.dm_channel_id')
           echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
+          echo "ASSIGNEE_DM_CHANNEL_ID=$ASSIGNEE_DM_CHANNEL_ID" >> $GITHUB_ENV
 
           REVIEWER="${{ github.event.review.user.login }}"
-          REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
+          REVIEWER_INFO=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER)')
+          REVIEWER_SLACK_ID=$(echo "$REVIEWER_INFO" | jq -r '.slack_id')
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
       - name: Get PR details
@@ -60,27 +64,44 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
-      - name: Prepare Slack message
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
+      - name: Prepare Slack message for approval
+        if: steps.check_review.outputs.is_approval == 'true'
         run: |
-          if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
-            HEADER_TEXT="PR Approved"
-            HEADER_EMOJI=":white_check_mark:"
-          elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
-            HEADER_TEXT="New PR Comment"
-            HEADER_EMOJI=":speech_balloon:"
-          fi
-          
+          HEADER_TEXT="PR Approved"
+          HEADER_EMOJI=":white_check_mark:"
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
-          ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
-          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>" 
+          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
-              --arg assignee "$ASSIGNEE" \
               --arg approver "$SLACK_REVIEWERS" \
+              --arg branch "$BRANCH" \
+              --arg pr_link "$PR_LINK" \
+              --arg pr_title "$PR_TITLE" \
+              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
+                .blocks[1].fields[0].text |= sub("{{SLACK_REVIEWERS}}"; $approver) | 
+                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Prepare Slack message for comment
+        if: steps.check_review.outputs.is_comment == 'true'
+        run: |
+          HEADER_TEXT="New PR Comment"
+          HEADER_EMOJI=":speech_balloon:"
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+          BUTTON_TEXT="지금 당장 확인하기"
+          
+          COMMENT_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
+            jq --arg full_header "$FULL_HEADER" \
+              --arg button_text "$BUTTON_TEXT" \
+              --arg assignee "<@${ASSIGNEE_SLACK_ID}>" \
+              --arg approver "<@${REVIEWER_SLACK_ID}>" \
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
@@ -91,5 +112,7 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
-
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+          curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            -H 'Content-type: application/json' \
+            --data "$COMMENT_MESSAGE" https://slack.com/api/chat.postMessage
