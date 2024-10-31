@@ -13,15 +13,11 @@ permissions:
   checks: read
 
 env:
-  ALL_REVIEWERS: |
-    [
-      {"github_username": "portlogics-jina", "slack_id": "U07TTV10212"},
-      {"github_username": "pja9362", "slack_id": "U07TGB567BR"}
-    ]
+  ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
 
 jobs:
   notifyReviewComment:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -61,7 +57,7 @@ jobs:
           ASSIGNEE="<@${PR_AUTHOR_SLACK_ID}>" 
           SLACK_REVIEWERS="<@${COMMENTER_SLACK_ID}>"
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
-          
+
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
