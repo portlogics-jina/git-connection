@@ -1,8 +1,8 @@
-name: PR Approval and Comment Notifications
+name: Auto PR Settings
 
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [opened]
 
 permissions:
   contents: read
@@ -14,94 +14,122 @@ permissions:
 
 env:
   ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
+  SELECTED_REVIEWERS: "[]"
+  ASSIGNEE_SLACK_ID: ""
 
 jobs:
-  notifyReview:
+  updatePullRequest:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Check review state
-        id: check_review
+      - name: Make changes to pull request
+        run: date +%s > report.txt
+
+      - name: Get branch names
+        id: branch-names
+        uses: tj-actions/branch-names@v8
+
+      - name: Get branch prefix
+        id: get_branch_prefix
+        if: steps.branch-names.outputs.is_default == 'false'
         run: |
-          REVIEW_STATE="${{ github.event.review.state }}"
-          echo "review_state=$REVIEW_STATE" >> $GITHUB_ENV
-          if [[ "$REVIEW_STATE" == "approved" ]]; then
-            echo "is_approval=true" >> $GITHUB_OUTPUT
-          elif [[ "$REVIEW_STATE" == "commented" ]]; then
-            echo "is_comment=true" >> $GITHUB_OUTPUT
-          fi
+          PREFIX=$(echo ${{ steps.branch-names.outputs.current_branch }} | awk -F'/' '{print toupper($1)}')
+          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "pr_title=[$PREFIX]: ${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
 
-      - name: Get PR author and reviewer information
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
+      - name: Determine label based on base branch
+        id: get_label
         run: |
-          ASSIGNEE=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
-          ASSIGNEE_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).slack_id')
-          echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+          PREFIX=${{ steps.get_branch_prefix.outputs.PREFIX }}
+          LABELS=()
 
-          REVIEWER="${{ github.event.review.user.login }}"
-          REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
-          echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
+          # Add the prefix as a label
+          LABELS+=("$PREFIX")
 
-      - name: Get PR details
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
-        run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          PR_LINK="${{ github.event.pull_request.html_url }}"
-
-          echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
-
-      - name: Prepare and send Slack message
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
-        run: |
-          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
-            HEADER_TEXT="New PR Comment!"
-            HEADER_EMOJI=":speech_balloon:"
-            SLACK_API_URL="https://slack.com/api/chat.postMessage"
-
-            # DM 채널 ID 가져오기 (캐싱 방식 적용)
-            CACHE_FILE=".dm_channel_cache.json"
-            if [[ ! -f "$CACHE_FILE" ]]; then
-              echo '{}' > "$CACHE_FILE"
-            fi
-
-            ASSIGNEE_DM_CHANNEL=$(jq -r --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" '.[$ASSIGNEE] // empty' "$CACHE_FILE")
-
-            if [[ -z "$ASSIGNEE_DM_CHANNEL" ]]; then
-              echo "Creating new DM channel..."
-              RESPONSE=$(curl -s -X POST \
-                -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-                -H "Content-Type: application/json" \
-                --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
-                "https://slack.com/api/conversations.open")
-                
-              ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-              echo "$ASSIGNEE_DM_CHANNEL" > $GITHUB_ENV
-
-              # Cache the DM channel ID for future use
-              jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
-            fi
-
-            SLACK_CHANNEL="$ASSIGNEE_DM_CHANNEL"
+          if [[ "$BASE_BRANCH" == "develop" ]]; then
+            LABELS+=("Develop")
+          elif [[ "$BASE_BRANCH" == "staging" ]]; then
+            LABELS+=("Staging")
+          elif [[ "$BASE_BRANCH" == "main" ]]; then
+            LABELS+=("Main")
           else
-            HEADER_TEXT="PR Approved!"
-            HEADER_EMOJI=":white_check_mark:"
-            SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}"
+            LABELS+=("Unknown")
           fi
 
+          # Join the labels with a comma
+          LABEL_STRING=$(IFS=, ; echo "${LABELS[*]}")
+
+          echo "labels=$LABEL_STRING" >> $GITHUB_OUTPUT
+
+      - name: Select reviewers and assignee
+        id: select_reviewers
+        run: |
+          ACTOR="${{ github.actor }}"
+          RESULT=$(echo '${{ env.ALL_REVIEWERS }}' | jq -c --arg ACTOR "$ACTOR" '
+            reduce .[] as $item (
+              {"assignee_slack_id": null, "selected_reviewers": []};
+              if $item.github_username == $ACTOR then
+                .assignee_slack_id = $item.slack_id
+              else
+                .selected_reviewers += [$item]
+              end
+            )
+          ')
+          ASSIGNEE_SLACK_ID=$(echo "$RESULT" | jq -r '.assignee_slack_id')
+          SELECTED_REVIEWERS=$(echo "$RESULT" | jq -c '.selected_reviewers')
+          echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
+          echo "SELECTED_REVIEWERS=$SELECTED_REVIEWERS" >> $GITHUB_ENV
+
+      - name: Update PR title and body
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
+            --body "${{ github.event.pull_request.body }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add assignees to PR
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-assignee ${{ github.event.pull_request.user.login }}
+          echo "Added assignee: ${{ github.event.pull_request.user.login }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add reviewers to PR
+        run: |
+          TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          if [ "$TARGET_BRANCH" == "main" ]; then
+            echo "Skipping reviewer assignment because target branch is $TARGET_BRANCH."
+          else
+            REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map(.github_username) | join(",")')
+            gh pr edit ${{ github.event.pull_request.number }} --add-reviewer "$REVIEWERS"
+            echo "Added reviewers: $REVIEWERS"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Slack notification
+        run: |
+          HEADER_TEXT="New Pull Request"
+          HEADER_EMOJI=":hammer_and_wrench:"
+          TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          BUTTON_TEXT="지금 당장 리뷰하기"
+          ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
+          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@\(.slack_id)>") | join(" ")')
+          BRANCH="${{ github.event.pull_request.base.ref }}"
+          PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
+          PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+  
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
-          BUTTON_TEXT="지금 당장 확인하기"
-          ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
-          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -111,9 +139,7 @@ jobs:
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
-              --arg channel "$SLACK_CHANNEL" \
-              '.channel = $channel |
-                .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
+              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
@@ -121,8 +147,5 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
-            curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H "Content-type: application/json" --data "$SLACK_MESSAGE" $SLACK_API_URL
-          else
-            curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H 'Content-type: application/json' --data "$SLACK_MESSAGE" $SLACK_CHANNEL
-          fi
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} 
+  
