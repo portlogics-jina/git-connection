@@ -50,7 +50,7 @@ jobs:
 
       - name: Send Slack notification
         run: |
-          HEADER_TEXT="PR Approved!"
+          HEADER_TEXT="PR Approved"
           HEADER_EMOJI=":white_check_mark:"
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
