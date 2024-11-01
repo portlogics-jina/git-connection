@@ -14,7 +14,7 @@ permissions:
 
 env:
   ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-
+    
 jobs:
   notifyReview:
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
           ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-
+      
       - name: Get PR details
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
@@ -74,6 +74,7 @@ jobs:
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
+            ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
 
             echo "COMMENT MESSAGE"
           fi
@@ -99,48 +100,43 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-      - name: Send Slack message
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
-        run: |
-          SLACK_API_URL="https://slack.com/api/chat.postMessage"
-
-          # Try sending the message first
-          RESPONSE=$(curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-            -H "Content-Type: application/json; charset=utf-8" \
-            --data "{
-              \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
-              \"text\": \"PR Comment Notification\",
-              \"blocks\": ${SLACK_MESSAGE}
-            }" \
-            "${SLACK_API_URL}" || true)
-
-          # Check if the channel exists
-          if [[ "$(echo "$RESPONSE" | jq -r .ok)" == "false" ]]; then
-            if [[ "$(echo "$RESPONSE" | jq -r .error)" == "channel_not_found" ]]; then
-              # Create a new DM channel
-              DM_CHANNEL_RESPONSE=$(curl -X POST \
+            if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
+            SLACK_API_URL="https://slack.com/api/chat.postMessage"
+            
+            # DM 채널 ID가 없거나 유효하지 않은 경우 새로운 DM 채널 생성
+            if [ -z "${ASSIGNEE_DM_CHANNEL}" ]; then
+              echo "Creating new DM channel..."
+              RESPONSE=$(curl -X POST \
                 -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-                -H "Content-Type: application/json; charset=utf-8" \
-                --data "{
-                  \"users\": \"${ASSIGNEE_SLACK_ID}\"
-                }" \
-                "${SLACK_API_URL}/conversations.open")
-
-              # Get the new channel ID
-              NEW_CHANNEL_ID=$(echo "$DM_CHANNEL_RESPONSE" | jq -r .channel.id)
-
-              # Resend the message to the newly created channel
-              curl -X POST \
-                -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-                -H "Content-Type: application/json; charset=utf-8" \
-                --data "{
-                  \"channel\": \"${NEW_CHANNEL_ID}\",
-                  \"text\": \"PR Comment Notification\",
-                  \"blocks\": ${SLACK_MESSAGE}
-                }" \
-                "${SLACK_API_URL}"
-            else
-              echo "Failed to send message: $RESPONSE"
+                -H "Content-Type: application/json" \
+                --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
+                "https://slack.com/api/conversations.open")
+              
+              ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
+              
+              if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
+                echo "Failed to create DM channel"
+                exit 1
+              fi
             fi
+
+            # DM 메시지 전송
+            RESPONSE=$(curl -X POST \
+              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              --data "{
+                \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+                \"text\": \"PR Comment Notification\",
+                \"blocks\": ${SLACK_MESSAGE}
+              }" \
+              "${SLACK_API_URL}")
+
+            # 에러 체크
+            if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
+              echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
+              exit 1
+            fi
+          else
+            curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
           fi
+        
