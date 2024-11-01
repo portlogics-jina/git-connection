@@ -100,9 +100,9 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-            if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
+          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
-            
+              
             # DM 채널 ID가 없거나 유효하지 않은 경우 새로운 DM 채널 생성
             if [ -z "${ASSIGNEE_DM_CHANNEL}" ]; then
               echo "Creating new DM channel..."
@@ -111,41 +111,40 @@ jobs:
                 -H "Content-Type: application/json" \
                 --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
                 "https://slack.com/api/conversations.open")
+              
+              # 디버깅을 위한 응답 출력
+              echo "API Response: $RESPONSE"
+                
+              # 응답이 성공적인지 확인
+              if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
+                echo "Error creating DM channel: $(echo $RESPONSE | jq -r '.error')"
+                exit 1
             
-            # 디버깅을 위한 응답 출력
-            echo "API Response: $RESPONSE"
-            
-            # 응답이 성공적인지 확인
-            if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
-              echo "Error creating DM channel: $(echo $RESPONSE | jq -r '.error')"
-              exit 1
-            fi
-            
-            ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-            
-            if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
-              echo "Failed to create DM channel - No channel ID received"
-              exit 1
-            fi
-            
-            echo "Successfully created DM channel"
+              ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
+                
+              if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
+                echo "Failed to create DM channel - No channel ID received"
+                exit 1
+              fi
+                
+              echo "Successfully created DM channel"
 
-            # DM 메시지 전송
-            RESPONSE=$(curl -X POST \
-              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              -H "Content-Type: application/json; charset=utf-8" \
-              --data "{
-                \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
-                \"text\": \"PR Comment Notification\",
-                \"blocks\": ${SLACK_MESSAGE}
-              }" \
-              "${SLACK_API_URL}")
+              # DM 메시지 전송
+              RESPONSE=$(curl -X POST \
+                -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+                -H "Content-Type: application/json; charset=utf-8" \
+                --data "{
+                  \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+                  \"text\": \"PR Comment Notification\",
+                  \"blocks\": ${SLACK_MESSAGE}
+                }" \
+                "${SLACK_API_URL}")
 
-            # 에러 체크
-            if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
-              echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
-              exit 1
-            fi
+              # 에러 체크
+              if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
+                echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
+                exit 1
+              fi
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
           fi
