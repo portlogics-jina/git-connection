@@ -1,4 +1,4 @@
-name: PR Approval and Comment Notifications
+name: PR Approval and Comment Notifications 
 
 on:
   pull_request_review:
@@ -72,10 +72,10 @@ jobs:
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
-            HEADER_TEXT="PR Approved"
+            HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
-            HEADER_TEXT="New PR Comment"
+            HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
           fi
           
