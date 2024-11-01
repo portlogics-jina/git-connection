@@ -129,29 +129,33 @@ jobs:
             # DM 메시지 전송
             echo "Sending message to DM channel: ${ASSIGNEE_DM_CHANNEL}"
             
-            # blocks 배열만 추출
+            # blocks 배열만 추출하고 이스케이프 처리
             ESCAPED_SLACK_MESSAGE=$(echo "$SLACK_MESSAGE" | jq -c '.blocks')
+            
+            # 메시지 전송 전 토큰 확인
+            echo "Using token: ${SLACK_OAUTH_TOKEN:0:10}..." # 토큰의 처음 10자리만 출력
             
             RESPONSE=$(curl -X POST \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              -H "Content-Type: application/json; charset=utf-8" \
+              -H "Content-Type: application/json" \
               --data "{
                 \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
                 \"text\": \"PR Comment Notification\",
-                \"blocks\": ${ESCAPED_SLACK_MESSAGE}
+                \"blocks\": ${ESCAPED_SLACK_MESSAGE},
+                \"as_user\": true
               }" \
               "https://slack.com/api/chat.postMessage")
 
-            # 디버깅을 위한 응답 출력
-            echo "Send Message Response: $RESPONSE"
+            # 자세한 디버깅 정보 출력
+            echo "Full API Response:"
+            echo "$RESPONSE" | jq '.'
 
-            # 디버깅을 위한 메시지 페이로드 출력
-            echo "Message payload:"
-            echo "{
-              \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
-              \"text\": \"PR Comment Notification\",
-              \"blocks\": ${ESCAPED_SLACK_MESSAGE}
-            }" | jq '.'
+            # 채널 정보 확인
+            echo "Verifying channel access..."
+            CHANNEL_INFO=$(curl -X GET \
+              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+              "https://slack.com/api/conversations.info?channel=${ASSIGNEE_DM_CHANNEL}")
+            echo "Channel Info: $CHANNEL_INFO"
 
             # 에러 체크
             if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
