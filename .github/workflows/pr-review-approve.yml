@@ -116,5 +116,12 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          echo "~~ SLACK_MESSAGE=$SLACK_MESSAGE" >> $GITHUB_ENV
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" $SLACK_CHANNEL
+          echo "!! SLACK_MESSAGE=$SLACK_MESSAGE" >> $GITHUB_ENV
+
+          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
+            # DM 채널로 메시지 전송
+            curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H "Content-type: application/json" --data "$SLACK_MESSAGE" $SLACK_API_URL
+          else
+            # 기존 웹훅 URL로 메시지 전송
+            curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" $SLACK_CHANNEL
+          fi
