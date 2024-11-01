@@ -92,7 +92,7 @@ jobs:
       - name: Prepare Slack message for comment
         if: steps.check_review.outputs.is_comment == 'true'
         run: |
-          HEADER_TEXT="New PR Comment"
+          HEADER_TEXT="New Comment for your PR"
           HEADER_EMOJI=":speech_balloon:"
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
