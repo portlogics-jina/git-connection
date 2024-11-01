@@ -14,7 +14,7 @@ permissions:
 
 env:
   ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-    
+
 jobs:
   notifyReview:
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
           ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-      
+
       - name: Get PR details
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
@@ -69,16 +69,14 @@ jobs:
             HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
             SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}"
-
             echo "APPROVAL MESSAGE"
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
             ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-
             echo "COMMENT MESSAGE"
           fi
-          
+
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
@@ -86,66 +84,66 @@ jobs:
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
-              --arg button_text "$BUTTON_TEXT" \
-              --arg assignee "$ASSIGNEE" \
-              --arg approver "$SLACK_REVIEWERS" \
-              --arg branch "$BRANCH" \
-              --arg pr_link "$PR_LINK" \
-              --arg pr_title "$PR_TITLE" \
-              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
-                .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
-                .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $approver) | 
-                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
+               --arg button_text "$BUTTON_TEXT" \
+               --arg assignee "$ASSIGNEE" \
+               --arg approver "$SLACK_REVIEWERS" \
+               --arg branch "$BRANCH" \
+               --arg pr_link "$PR_LINK" \
+               --arg pr_title "$PR_TITLE" \
+               '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) |
+                .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) |
+                .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $approver) |
+                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) |
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
+          if [[ "${{ steps.check_review.outputs.is_approval }}" == 'true' ]]; then
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
-              
+            
             # DM 채널 ID가 없거나 유효하지 않은 경우 새로운 DM 채널 생성
-            if [ -z "${ASSIGNEE_DM_CHANNEL}" ]; then
+            if [[ -z "${ASSIGNEE_DM_CHANNEL}" ]]; then
               echo "Creating new DM channel..."
               RESPONSE=$(curl -X POST \
-                -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
                 -H "Content-Type: application/json" \
                 --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
                 "https://slack.com/api/conversations.open")
-              
+
               # 디버깅을 위한 응답 출력
               echo "API Response: $RESPONSE"
-                
+
               # 응답이 성공적인지 확인
               if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
                 echo "Error creating DM channel: $(echo $RESPONSE | jq -r '.error')"
                 exit 1
-            
+              fi
+
               ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-                
-              if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
+              if [[ -z "${ASSIGNEE_DM_CHANNEL}" || "${ASSIGNEE_DM_CHANNEL}" == "null" ]]; then
                 echo "Failed to create DM channel - No channel ID received"
                 exit 1
               fi
-                
+
               echo "Successfully created DM channel"
+            fi
 
-              # DM 메시지 전송
-              RESPONSE=$(curl -X POST \
-                -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-                -H "Content-Type: application/json; charset=utf-8" \
-                --data "{
-                  \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
-                  \"text\": \"PR Comment Notification\",
-                  \"blocks\": ${SLACK_MESSAGE}
-                }" \
-                "${SLACK_API_URL}")
+            # DM 메시지 전송
+            RESPONSE=$(curl -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              --data "{
+                \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+                \"text\": \"PR Comment Notification\",
+                \"blocks\": ${SLACK_MESSAGE}
+              }" \
+              "${SLACK_API_URL}")
 
-              # 에러 체크
-              if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
-                echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
-                exit 1
-              fi
+            # 에러 체크
+            if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
+              echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
+              exit 1
+            fi
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
           fi
-        
