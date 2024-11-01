@@ -60,7 +60,7 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
-      - name: Prepare Slack message
+      - name: Prepare and send Slack message
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
@@ -68,10 +68,15 @@ jobs:
             HEADER_EMOJI=":speech_balloon:"
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
 
-            # DM 채널 ID 가져오기
-            ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-            
-            if [[ -z "${ASSIGNEE_DM_CHANNEL}" ]]; then
+            # DM 채널 ID 가져오기 (캐싱 방식 적용)
+            CACHE_FILE=".dm_channel_cache.json"
+            if [[ ! -f "$CACHE_FILE" ]]; then
+              echo '{}' > "$CACHE_FILE"
+            fi
+
+            ASSIGNEE_DM_CHANNEL=$(jq -r --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" '.[$ASSIGNEE] // empty' "$CACHE_FILE")
+
+            if [[ -z "$ASSIGNEE_DM_CHANNEL" ]]; then
               echo "Creating new DM channel..."
               RESPONSE=$(curl -s -X POST \
                 -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
@@ -80,10 +85,13 @@ jobs:
                 "https://slack.com/api/conversations.open")
                 
               ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-              echo "ASSIGNEE_DM_CHANNEL=$ASSIGNEE_DM_CHANNEL" >> $GITHUB_ENV
+              echo "$ASSIGNEE_DM_CHANNEL" > $GITHUB_ENV
+
+              # Cache the DM channel ID for future use
+              jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
             fi
-            
-            SLACK_CHANNEL="${ASSIGNEE_DM_CHANNEL}"
+
+            SLACK_CHANNEL="$ASSIGNEE_DM_CHANNEL"
           else
             HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
