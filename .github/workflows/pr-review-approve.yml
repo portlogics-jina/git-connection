@@ -129,8 +129,8 @@ jobs:
             # DM 메시지 전송
             echo "Sending message to DM channel: ${ASSIGNEE_DM_CHANNEL}"
             
-            # JSON 문자열 이스케이프 처리
-            ESCAPED_SLACK_MESSAGE=$(echo "$SLACK_MESSAGE" | jq -c '.')
+            # blocks 배열만 추출
+            ESCAPED_SLACK_MESSAGE=$(echo "$SLACK_MESSAGE" | jq -c '.blocks')
             
             RESPONSE=$(curl -X POST \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
@@ -144,6 +144,14 @@ jobs:
 
             # 디버깅을 위한 응답 출력
             echo "Send Message Response: $RESPONSE"
+
+            # 디버깅을 위한 메시지 페이로드 출력
+            echo "Message payload:"
+            echo "{
+              \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+              \"text\": \"PR Comment Notification\",
+              \"blocks\": ${ESCAPED_SLACK_MESSAGE}
+            }" | jq '.'
 
             # 에러 체크
             if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
