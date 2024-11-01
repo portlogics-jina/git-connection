@@ -60,8 +60,22 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
+      - name: Check if self-comment
+        if: steps.check_review.outputs.is_comment == 'true'
+        id: check_self_comment
+        run: |
+          # PR 작성자와 코멘트 작성자가 같은지 확인
+          if [[ "${{ github.event.pull_request.user.login }}" == "${{ github.event.review.user.login }}" ]]; then
+            echo "is_self_comment=true" >> $GITHUB_OUTPUT
+            echo "Skip notification for self-comment"
+          else
+            echo "is_self_comment=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Prepare and send Slack message
-        if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
+        if: |
+          (steps.check_review.outputs.is_approval == 'true') || 
+          (steps.check_review.outputs.is_comment == 'true' && steps.check_self_comment.outputs.is_self_comment != 'true')
         run: |
           if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             HEADER_TEXT="New PR Comment!"
