@@ -71,7 +71,7 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
-      - name: Prepare and Send Slack message
+      - name: Prepare Slack message
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
@@ -81,15 +81,15 @@ jobs:
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
-            SLACK_CHANNEL="${{ env.ASSIGNEE_DM_CHANNEL }}" # 개인 DM 채널 ID 사용
-
-            echo "SLACK_CHANNEL=$SLACK_CHANNEL" >> $GITHUB_ENV
+            SLACK_CHANNEL="${{ env.ASSIGNEE_DM_CHANNEL }}" # Assignee의 개인 DM 채널 ID 사용
           fi
           
+          echo "SLACK_CHANNEL=$SLACK_CHANNEL" >> $GITHUB_ENV
+
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
-          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>" 
+          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -107,4 +107,13 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
+          if [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
+            # DM 채널에 메시지를 보내기 위한 Slack API URL
+            SLACK_API_URL="https://slack.com/api/chat.postMessage"
+            curl -X POST -H 'Content-type: application/json' \
+              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+              --data '{"channel":"'"$SLACK_CHANNEL"'", "text":"'"$SLACK_MESSAGE"'"}' \
+              "$SLACK_API_URL"
+          else
+            curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
+          fi
