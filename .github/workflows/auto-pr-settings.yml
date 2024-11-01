@@ -127,7 +127,6 @@ jobs:
           BRANCH="${{ github.event.pull_request.base.ref }}"
           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-          COMMENT_PREVIEW=""  # 빈 문자열로 설정
   
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
@@ -139,13 +138,12 @@ jobs:
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
-              --arg comment_preview "$COMMENT_PREVIEW" \
               '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
-                .blocks[3].text.text |= sub("{{COMMENT_PREVIEW}}"; $comment_preview) |
+                .blocks |= del(.[3]) |
                 .blocks[4].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[4].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
