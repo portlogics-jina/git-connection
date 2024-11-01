@@ -128,19 +128,32 @@ jobs:
 
             # DM 메시지 전송
             echo "Sending message to DM channel: ${ASSIGNEE_DM_CHANNEL}"
+            
+            # JSON 문자열 이스케이프 처리
+            ESCAPED_SLACK_MESSAGE=$(echo "$SLACK_MESSAGE" | jq -c '.')
+            
             RESPONSE=$(curl -X POST \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
               -H "Content-Type: application/json; charset=utf-8" \
               --data "{
                 \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
                 \"text\": \"PR Comment Notification\",
-                \"blocks\": ${SLACK_MESSAGE}
+                \"blocks\": ${ESCAPED_SLACK_MESSAGE}
               }" \
               "https://slack.com/api/chat.postMessage")
+
+            # 디버깅을 위한 응답 출력
+            echo "Send Message Response: $RESPONSE"
 
             # 에러 체크
             if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
               echo "Error sending message: $(echo $RESPONSE | jq -r '.error')"
+              echo "Full message payload:"
+              echo "{
+                \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+                \"text\": \"PR Comment Notification\",
+                \"blocks\": ${ESCAPED_SLACK_MESSAGE}
+              }"
               exit 1
             fi
           else
