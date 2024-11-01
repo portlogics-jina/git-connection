@@ -65,14 +65,18 @@ jobs:
       - name: Prepare Slack message
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
-          if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
+          if [[ "${{ steps.check_review.outputs.is_approval }}" == 'true' ]]; then
             HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
             SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}"
-          elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
+
+            echo "APPROVAL MESSAGE"
+          elif [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
             ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
+
+            echo "COMMENT MESSAGE"
           fi
           
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
