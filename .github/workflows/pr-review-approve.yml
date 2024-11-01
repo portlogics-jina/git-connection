@@ -14,15 +14,7 @@ permissions:
 
 env:
   ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-
-    #   {
-    #     "github_username": "username",
-    #     "slack_id": "slack_id",
-    #     "dm_channel_id": "dm_channel_id"
-    #   }
-    # ]
     
-
 jobs:
   notifyReview:
     runs-on: ubuntu-latest
@@ -76,7 +68,7 @@ jobs:
           if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
             HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
-            SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}" # 전체 채널 URL 사용
+            SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}"
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
@@ -108,8 +100,7 @@ jobs:
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
             curl -X POST -H 'Content-type: application/json' \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              --data '{"channel":"'"$ASSIGNEE_DM_CHANNEL"'", "text":"'"$SLACK_MESSAGE"'"}' \
-              "$SLACK_API_URL"
+              --data "$SLACK_MESSAGE" "$ASSIGNEE_DM_CHANNEL"
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
           fi
