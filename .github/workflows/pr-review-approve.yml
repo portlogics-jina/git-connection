@@ -123,8 +123,9 @@ jobs:
 
           echo "$SLACK_MESSAGE" | jq .
 
+          # 슬랙 메시지 전송 (코멘트 시 DM, 승인 시 웹훅 URL 사용)
           if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H "Content-type: application/json" --data "$SLACK_MESSAGE" $SLACK_API_URL
           else
-            curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" $SLACK_CHANNEL
+            curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H 'Content-type: application/json' --data "$SLACK_MESSAGE" $SLACK_CHANNEL
           fi
