@@ -51,14 +51,11 @@ jobs:
         run: |
           ASSIGNEE=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
           ASSIGNEE_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).slack_id')
-          echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
 
           REVIEWER="${{ github.event.review.user.login }}"
           REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
-          echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
           ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-          echo "ASSIGNEE_DM_CHANNEL=$ASSIGNEE_DM_CHANNEL" >> $GITHUB_ENV
 
       - name: Get PR details
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
@@ -81,11 +78,9 @@ jobs:
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
-            SLACK_CHANNEL="${{ env.ASSIGNEE_DM_CHANNEL }}" # Assignee의 개인 DM 채널 ID 사용
+            ASSIGNEE_DM_CHANNEL=$(echo "${{ env.ALL_REVIEWERS }}" | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
           fi
           
-          echo "SLACK_CHANNEL=$SLACK_CHANNEL" >> $GITHUB_ENV
-
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
@@ -108,11 +103,10 @@ jobs:
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
           if [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
-            # DM 채널에 메시지를 보내기 위한 Slack API URL
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
             curl -X POST -H 'Content-type: application/json' \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              --data '{"channel":"'"$SLACK_CHANNEL"'", "text":"'"$SLACK_MESSAGE"'"}' \
+              --data '{"channel":"'"$ASSIGNEE_DM_CHANNEL"'", "text":"'"$SLACK_MESSAGE"'"}' \
               "$SLACK_API_URL"
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
