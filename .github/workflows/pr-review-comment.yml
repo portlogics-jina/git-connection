@@ -75,35 +75,11 @@ jobs:
         run: |
           HEADER_TEXT="New PR Comment!"
           HEADER_EMOJI=":speech_balloon:"
-          SLACK_API_URL="https://slack.com/api/chat.postMessage"
-
-          # DM 채널 ID 가져오기 (캐싱 방식 적용)
-          CACHE_FILE=".dm_channel_cache.json"
-          if [[ ! -f "$CACHE_FILE" ]]; then
-            echo '{}' > "$CACHE_FILE"
-          fi
-
-          ASSIGNEE_DM_CHANNEL=$(jq -r --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" '.[$ASSIGNEE] // empty' "$CACHE_FILE")
-
-          if [[ -z "$ASSIGNEE_DM_CHANNEL" ]]; then
-            echo "Creating new DM channel..."
-            RESPONSE=$(curl -s -X POST \
-              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
-              "https://slack.com/api/conversations.open")
-              
-            ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-            echo "ASSIGNEE_DM_CHANNEL=${ASSIGNEE_DM_CHANNEL}" >> $GITHUB_ENV
-
-            # Cache the DM channel ID for future use
-            jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
-          fi
-
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
+          COMMENT_PREVIEW="*코멘트:*\n\`\`\`${COMMENT_PREVIEW}\`\`\`"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -121,15 +97,9 @@ jobs:
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
-                .blocks |= (. + [{
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*코멘트:*\n```\($comment_preview)```"
-                  }
-                }]) |
-                .blocks[-1].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[-1].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[3].text.text |= sub("{{COMMENT_PREVIEW}}"; $comment_preview) |
+                .blocks[4].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[4].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \

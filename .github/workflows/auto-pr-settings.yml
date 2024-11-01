@@ -121,7 +121,6 @@ jobs:
         run: |
           HEADER_TEXT="New Pull Request"
           HEADER_EMOJI=":hammer_and_wrench:"
-          TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
           BUTTON_TEXT="지금 당장 리뷰하기"
           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
           SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@\(.slack_id)>") | join(" ")')
@@ -143,9 +142,10 @@ jobs:
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
-                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
-                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+                .blocks |= del(.[3]) |
+                .blocks[4].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[4].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
           curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} 
   

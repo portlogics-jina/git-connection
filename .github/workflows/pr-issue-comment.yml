@@ -124,13 +124,13 @@ jobs:
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
-                .blocks |= (. + [{
+                .blocks += [{
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
                     "text": "*코멘트:*\n```\($comment_preview)```"
                   }
-                }]) |
+                }] |
                 .blocks[-1].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[-1].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
