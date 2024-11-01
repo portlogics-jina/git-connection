@@ -72,7 +72,7 @@ jobs:
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
-            ASSIGNEE_DM_CHANNEL=$(echo "${{ env.ALL_REVIEWERS }}" | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
+            ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
           fi
           
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
@@ -100,7 +100,9 @@ jobs:
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
             curl -X POST -H 'Content-type: application/json' \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              --data "$SLACK_MESSAGE" "$ASSIGNEE_DM_CHANNEL"
+              -H "Content-Type: application/json; charset=utf-8" \
+              --data "{\"channel\":\"${ASSIGNEE_DM_CHANNEL}\",\"blocks\":${SLACK_MESSAGE}}" \
+              "${SLACK_API_URL}"
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
           fi
