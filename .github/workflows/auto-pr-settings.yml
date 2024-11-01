@@ -96,13 +96,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Add labels to PR
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} \
-            --add-label ${{ steps.get_label.outputs.labels }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Add assignees to PR
         run: |
           gh pr edit ${{ github.event.pull_request.number }} \
