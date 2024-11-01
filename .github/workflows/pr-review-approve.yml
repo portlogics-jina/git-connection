@@ -100,12 +100,16 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          if [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
+          if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
-            curl -X POST -H 'Content-type: application/json' \
+            curl -X POST \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
               -H "Content-Type: application/json; charset=utf-8" \
-              --data "{\"channel\":\"${ASSIGNEE_DM_CHANNEL}\",\"blocks\":${SLACK_MESSAGE}}" \
+              --data "{
+                \"channel\": \"${ASSIGNEE_DM_CHANNEL}\",
+                \"text\": \"PR Comment Notification\",
+                \"blocks\": ${SLACK_MESSAGE}
+              }" \
               "${SLACK_API_URL}"
           else
             curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
