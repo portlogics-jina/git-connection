@@ -111,14 +111,24 @@ jobs:
                 -H "Content-Type: application/json" \
                 --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
                 "https://slack.com/api/conversations.open")
-              
-              ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-              
-              if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
-                echo "Failed to create DM channel"
-                exit 1
-              fi
+            
+            # 디버깅을 위한 응답 출력
+            echo "API Response: $RESPONSE"
+            
+            # 응답이 성공적인지 확인
+            if [[ $(echo $RESPONSE | jq -r '.ok') != "true" ]]; then
+              echo "Error creating DM channel: $(echo $RESPONSE | jq -r '.error')"
+              exit 1
             fi
+            
+            ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
+            
+            if [ -z "${ASSIGNEE_DM_CHANNEL}" ] || [ "${ASSIGNEE_DM_CHANNEL}" = "null" ]; then
+              echo "Failed to create DM channel - No channel ID received"
+              exit 1
+            fi
+            
+            echo "Successfully created DM channel"
 
             # DM 메시지 전송
             RESPONSE=$(curl -X POST \
