@@ -49,8 +49,6 @@ jobs:
           REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
-          ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
-
       - name: Get PR details
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
@@ -69,7 +67,7 @@ jobs:
             HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
             SLACK_API_URL="https://slack.com/api/chat.postMessage"
-            
+
             # DM 채널 ID 가져오기
             ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
             
@@ -95,7 +93,7 @@ jobs:
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
-          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>" 
+          SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -114,6 +112,8 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+
+          echo "$SLACK_MESSAGE" | jq .
 
           if [[ "${{ steps.check_review.outputs.is_comment }}" == 'true' ]]; then
             curl -X POST -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" -H "Content-type: application/json" --data "$SLACK_MESSAGE" $SLACK_API_URL
