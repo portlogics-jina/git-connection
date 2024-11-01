@@ -1,8 +1,8 @@
-name: PR Review Comment Notifications
+name: PR Issue Comment Notifications
 
 on:
-  pull_request_review:
-    types: [submitted]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -16,8 +16,8 @@ env:
   ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
 
 jobs:
-  notifyReviewComment:
-    if: github.event.review.state == 'commented'
+  notifyIssueComment:
+    if: github.event.issue.pull_request
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -31,32 +31,35 @@ jobs:
       - name: Check if self-comment
         id: check_self_comment
         run: |
-          # PR 작성자와 코멘트 작성자가 같은지 확인
-          if [[ "${{ github.event.pull_request.user.login }}" == "${{ github.event.review.user.login }}" ]]; then
+          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
+          COMMENTER="${{ github.actor }}"
+          
+          if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
             echo "is_self_comment=true" >> $GITHUB_OUTPUT
             echo "Skip notification for self-comment"
           else
             echo "is_self_comment=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get PR author and reviewer information
+      - name: Get PR author and commenter information
         if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
-          ASSIGNEE=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" --jq '.user.login')
-          ASSIGNEE_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).slack_id')
-          echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
-
-          REVIEWER="${{ github.event.review.user.login }}"
-          REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
-          echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
+          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
+          COMMENTER="${{ github.actor }}"
+          
+          PR_AUTHOR_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg PR_AUTHOR "$PR_AUTHOR" '.[] | select(.github_username == $PR_AUTHOR).slack_id')
+          COMMENTER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg COMMENTER "$COMMENTER" '.[] | select(.github_username == $COMMENTER).slack_id')
+          
+          echo "ASSIGNEE_SLACK_ID=$PR_AUTHOR_SLACK_ID" >> $GITHUB_ENV
+          echo "REVIEWER_SLACK_ID=$COMMENTER_SLACK_ID" >> $GITHUB_ENV
 
       - name: Get PR details
         if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          PR_LINK="${{ github.event.pull_request.html_url }}"
-
+          PR_TITLE=$(gh pr view ${{ github.event.issue.number }} --json title -q '.title')
+          BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName -q '.headRefName')
+          PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}"
+          
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
@@ -118,4 +121,4 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
             -H "Content-type: application/json" \
             --data "$SLACK_MESSAGE" \
-            $SLACK_API_URL
+            $SLACK_API_URL 
