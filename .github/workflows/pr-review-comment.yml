@@ -66,36 +66,13 @@ jobs:
         run: |
           HEADER_TEXT="New PR Comment!"
           HEADER_EMOJI=":speech_balloon:"
-          SLACK_API_URL="https://slack.com/api/chat.postMessage"
-
-          # DM 채널 ID 가져오기 (캐싱 방식 적용)
-          CACHE_FILE=".dm_channel_cache.json"
-          if [[ ! -f "$CACHE_FILE" ]]; then
-            echo '{}' > "$CACHE_FILE"
-          fi
-
-          ASSIGNEE_DM_CHANNEL=$(jq -r --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" '.[$ASSIGNEE] // empty' "$CACHE_FILE")
-
-          if [[ -z "$ASSIGNEE_DM_CHANNEL" ]]; then
-            echo "Creating new DM channel..."
-            RESPONSE=$(curl -s -X POST \
-              -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              --data "{\"users\": \"${ASSIGNEE_SLACK_ID}\"}" \
-              "https://slack.com/api/conversations.open")
-              
-            ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-            echo "ASSIGNEE_DM_CHANNEL=${ASSIGNEE_DM_CHANNEL}" >> $GITHUB_ENV
-
-            # Cache the DM channel ID for future use
-            jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
-          fi
-
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
+          COMMENT_PREVIEW="${{ github.event.review.body }}"
 
+          # 기본 메시지 구조 생성
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
@@ -104,15 +81,27 @@ jobs:
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
-              --arg channel "$ASSIGNEE_DM_CHANNEL" \
-              '.channel = $channel |
-                .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
+              '.blocks[0].text.text |= $full_header | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
-                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
-                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+                .blocks[3].elements[0].text.text |= $button_text |
+                .blocks[3].elements[0].url |= $pr_link')
+
+          # 코멘트가 있는 경우에만 코멘트 블록 추가
+          if [[ -n "${COMMENT_PREVIEW}" ]]; then
+            COMMENT_BLOCK='{
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*코멘트:*\n```'"${COMMENT_PREVIEW}"'```"
+              }
+            }'
+            
+            # 버튼 앞에 코멘트 블록 삽입
+            SLACK_MESSAGE=$(echo "$SLACK_MESSAGE" | jq --argjson block "$COMMENT_BLOCK" '.blocks = (.blocks[0:3] + [$block] + .blocks[3:])')
+          fi
 
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
