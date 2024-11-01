@@ -57,6 +57,9 @@ jobs:
           REVIEWER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg REVIEWER "$REVIEWER" '.[] | select(.github_username == $REVIEWER).slack_id')
           echo "REVIEWER_SLACK_ID=$REVIEWER_SLACK_ID" >> $GITHUB_ENV
 
+          ASSIGNEE_DM_CHANNEL=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.github_username == $ASSIGNEE).dm_channel_id')
+          echo "ASSIGNEE_DM_CHANNEL=$ASSIGNEE_DM_CHANNEL" >> $GITHUB_ENV
+
       - name: Get PR details
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
@@ -68,15 +71,19 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
-      - name: Prepare Slack message
+      - name: Prepare and Send Slack message
         if: steps.check_review.outputs.is_approval == 'true' || steps.check_review.outputs.is_comment == 'true'
         run: |
           if [[ "${{ steps.check_review.outputs.is_approval }}" == "true" ]]; then
-            HEADER_TEXT="PR Approved"
+            HEADER_TEXT="PR Approved!"
             HEADER_EMOJI=":white_check_mark:"
+            SLACK_CHANNEL="${{ secrets.SLACK_WEBHOOK_URL }}" # 전체 채널 URL 사용
           elif [[ "${{ steps.check_review.outputs.is_comment }}" == "true" ]]; then
-            HEADER_TEXT="New PR Comment"
+            HEADER_TEXT="New PR Comment!"
             HEADER_EMOJI=":speech_balloon:"
+            SLACK_CHANNEL="${{ env.ASSIGNEE_DM_CHANNEL }}" # 개인 DM 채널 ID 사용
+
+            echo "SLACK_CHANNEL=$SLACK_CHANNEL" >> $GITHUB_ENV
           fi
           
           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
@@ -100,4 +107,4 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" "$SLACK_CHANNEL"
