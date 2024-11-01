@@ -33,7 +33,7 @@ jobs:
         run: |
           PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
           COMMENTER="${{ github.actor }}"
-          
+
           if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
             echo "is_self_comment=true" >> $GITHUB_OUTPUT
             echo "Skip notification for self-comment"
@@ -46,10 +46,10 @@ jobs:
         run: |
           PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
           COMMENTER="${{ github.actor }}"
-          
+
           PR_AUTHOR_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg PR_AUTHOR "$PR_AUTHOR" '.[] | select(.github_username == $PR_AUTHOR).slack_id')
           COMMENTER_SLACK_ID=$(echo '${{ env.ALL_REVIEWERS }}' | jq -r --arg COMMENTER "$COMMENTER" '.[] | select(.github_username == $COMMENTER).slack_id')
-          
+
           echo "ASSIGNEE_SLACK_ID=$PR_AUTHOR_SLACK_ID" >> $GITHUB_ENV
           echo "REVIEWER_SLACK_ID=$COMMENTER_SLACK_ID" >> $GITHUB_ENV
 
@@ -59,10 +59,19 @@ jobs:
           PR_TITLE=$(gh pr view ${{ github.event.issue.number }} --json title -q '.title')
           BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName -q '.headRefName')
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}"
-          
+
+          # Get comment body and truncate it
+          COMMENT_BODY="${{ github.event.comment.body }}"
+          # Take first 150 characters and add ellipsis if needed
+          TRUNCATED_COMMENT=$(echo "$COMMENT_BODY" | cut -c 1-150)
+          if [ ${#COMMENT_BODY} -gt 150 ]; then
+            TRUNCATED_COMMENT="$TRUNCATED_COMMENT..."
+          fi
+
           echo "PR_TITLE=$PR_TITLE" >> $GITHUB_ENV
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
+          echo "COMMENT_PREVIEW=$TRUNCATED_COMMENT" >> $GITHUB_ENV
 
       - name: Send Slack notification
         if: steps.check_self_comment.outputs.is_self_comment != 'true'
@@ -107,18 +116,26 @@ jobs:
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
+              --arg comment_preview "$COMMENT_PREVIEW" \
               --arg channel "$ASSIGNEE_DM_CHANNEL" \
               '.channel = $channel |
                 .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
-                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
-                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+                .blocks |= (. + [{
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*코멘트:*\n```\($comment_preview)```"
+                  }
+                }]) |
+                .blocks[-1].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[-1].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
             -H "Content-type: application/json" \
             --data "$SLACK_MESSAGE" \
-            $SLACK_API_URL 
+            $SLACK_API_URL
