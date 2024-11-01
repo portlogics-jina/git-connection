@@ -121,7 +121,7 @@ jobs:
           if [ "$TARGET_BRANCH" == "main" ]; then
             echo "Skipping Slack notification because target branch is $TARGET_BRANCH."
           else
-            HEADER_TEXT="New Pull Request"
+            HEADER_TEXT="New Pull Request!"
             HEADER_EMOJI=":hammer_and_wrench:"
             BUTTON_TEXT="지금 당장 리뷰하기"
             ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
