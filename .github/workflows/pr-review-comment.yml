@@ -32,7 +32,6 @@ jobs:
       - name: Check if self-comment
         id: check_self_comment
         run: |
-          # PR 작성자와 코멘트 작성자가 같은지 확인
           PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
           COMMENTER="${{ github.actor }}"
           
@@ -119,9 +118,6 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          echo "$SLACK_MESSAGE" | jq .
-
-          # 슬랙 메시지 전송
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
             -H "Content-type: application/json" \
