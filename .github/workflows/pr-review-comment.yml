@@ -77,7 +77,6 @@ jobs:
           ASSIGNEE_DM_CHANNEL=$(jq -r --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" '.[$ASSIGNEE] // empty' "$CACHE_FILE")
 
           if [[ -z "$ASSIGNEE_DM_CHANNEL" ]]; then
-            echo "Creating new DM channel..."
             RESPONSE=$(curl -s -X POST \
               -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
               -H "Content-Type: application/json" \
@@ -99,7 +98,7 @@ jobs:
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
-              --arg assignee "$ASSIGNEE" \
+              --arg assignee "$ASSIGNEE" \s
               --arg slack_reviewers "$SLACK_REVIEWERS" \
               --arg branch "$BRANCH" \
               --arg pr_link "$PR_LINK" \
