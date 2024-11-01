@@ -13,11 +13,7 @@ permissions:
   checks: read
 
 env:
-  ALL_REVIEWERS: |
-    [
-      {"github_username": "portlogics-jina", "slack_id": "U07TTV10212"},
-      {"github_username": "pja9362", "slack_id": "U07TGB567BR"}
-    ]
+  ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
 
 jobs:
   notifyReviewComment:
