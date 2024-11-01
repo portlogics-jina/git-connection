@@ -85,7 +85,7 @@ jobs:
                 "https://slack.com/api/conversations.open")
                 
               ASSIGNEE_DM_CHANNEL=$(echo $RESPONSE | jq -r '.channel.id')
-              echo "$ASSIGNEE_DM_CHANNEL" > $GITHUB_ENV
+              echo "ASSIGNEE_DM_CHANNEL=${ASSIGNEE_DM_CHANNEL}" >> $GITHUB_ENV
 
               # Cache the DM channel ID for future use
               jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
