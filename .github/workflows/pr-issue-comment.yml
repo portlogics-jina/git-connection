@@ -103,7 +103,7 @@ jobs:
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           COMMENT_PREVIEW=$(gh issue view ${{ github.event.issue.number }} --json body -q '.body')
-          echo "!!! COMMENT_PREVIEW=$COMMENT_PREVIEW" >> $GITHUB_ENV
+          echo "!!@@! COMMENT_PREVIEW=$COMMENT_PREVIEW" >> $GITHUB_ENV
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
