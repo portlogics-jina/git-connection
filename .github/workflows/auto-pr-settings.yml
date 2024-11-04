@@ -12,11 +12,6 @@ permissions:
   statuses: read
   checks: read
 
-env:
-  ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-  SELECTED_REVIEWERS: "[]"
-  ASSIGNEE_SLACK_ID: ""
-
 jobs:
   updatePullRequest:
     runs-on: ubuntu-latest
@@ -29,8 +24,11 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Make changes to pull request
-        run: date +%s > report.txt
+      - name: Load reviewers from reviewers.json
+        id: load_reviewers
+        run: |
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
       - name: Get branch names
         id: branch-names
@@ -48,11 +46,8 @@ jobs:
         id: get_label
         run: |
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          PREFIX=${{ steps.get_branch_prefix.outputs.PREFIX }}
-          LABELS=()
-
-          # Add the prefix as a label
-          LABELS+=("$PREFIX")
+          PREFIX=${{ steps.get_branch_prefix.outputs.prefix }}
+          LABELS=("$PREFIX")
 
           if [[ "$BASE_BRANCH" == "develop" ]]; then
             LABELS+=("Develop")
@@ -64,16 +59,14 @@ jobs:
             LABELS+=("Unknown")
           fi
 
-          # Join the labels with a comma
           LABEL_STRING=$(IFS=, ; echo "${LABELS[*]}")
-
           echo "labels=$LABEL_STRING" >> $GITHUB_OUTPUT
 
       - name: Select reviewers and assignee
         id: select_reviewers
         run: |
           ACTOR="${{ github.actor }}"
-          RESULT=$(echo '${{ env.ALL_REVIEWERS }}' | jq -c --arg ACTOR "$ACTOR" '
+          RESULT=$(jq -c --arg ACTOR "$ACTOR" '
             reduce .[] as $item (
               {"assignee_slack_id": null, "selected_reviewers": []};
               if $item.github_username == $ACTOR then
@@ -82,7 +75,7 @@ jobs:
                 .selected_reviewers += [$item]
               end
             )
-          ')
+          ' .github/workflows/reviewers.json)
           ASSIGNEE_SLACK_ID=$(echo "$RESULT" | jq -r '.assignee_slack_id')
           SELECTED_REVIEWERS=$(echo "$RESULT" | jq -c '.selected_reviewers')
           echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
@@ -100,7 +93,6 @@ jobs:
         run: |
           gh pr edit ${{ github.event.pull_request.number }} \
             --add-assignee ${{ github.event.pull_request.user.login }}
-          echo "Added assignee: ${{ github.event.pull_request.user.login }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -112,7 +104,6 @@ jobs:
           else
             REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map(.github_username) | join(",")')
             gh pr edit ${{ github.event.pull_request.number }} --add-reviewer "$REVIEWERS"
-            echo "Added reviewers: $REVIEWERS"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,31 +112,22 @@ jobs:
         run: |
           HEADER_TEXT="New Pull Request"
           HEADER_EMOJI=":hammer_and_wrench:"
-          TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
           BUTTON_TEXT="지금 당장 리뷰하기"
           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
-          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@\(.slack_id)>") | join(" ")')
-          BRANCH="${{ github.event.pull_request.base.ref }}"
+          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@"+.slack_id+">") | join(", ")')
           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
-  
-          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
-            jq --arg full_header "$FULL_HEADER" \
-              --arg button_text "$BUTTON_TEXT" \
+            jq --arg header "$HEADER_EMOJI $HEADER_TEXT" \
               --arg assignee "$ASSIGNEE" \
-              --arg slack_reviewers "$SLACK_REVIEWERS" \
-              --arg branch "$BRANCH" \
-              --arg pr_link "$PR_LINK" \
-              --arg pr_title "$PR_TITLE" \
-              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
-                .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
-                .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
-                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
-                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
-                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+              --arg reviewers "$SLACK_REVIEWERS" \
+              --arg title "$PR_TITLE" \
+              --arg link "$PR_LINK" \
+              '.blocks[0].text.text |= sub("{{HEADER}}"; $header) |
+               .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) |
+               .blocks[1].fields[1].text |= sub("{{REVIEWERS}}"; $reviewers) |
+               .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $title) |
+               .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $link)')
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }} 
-  
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
