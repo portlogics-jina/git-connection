@@ -1,4 +1,4 @@
-name: PR Issue Comment Notifications
+name: PR Issue Comment Notification
 
 on:
   issue_comment:
