@@ -1,4 +1,4 @@
-name: PR Approval Notifications
+name: PR Approval Notification
 
 on:
   pull_request_review:
