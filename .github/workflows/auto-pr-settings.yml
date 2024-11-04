@@ -124,7 +124,7 @@ jobs:
           TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
           BUTTON_TEXT="지금 당장 리뷰하기"
           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
-          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@\(.slack_id)>") | join(" ")')
+          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r '[.] | map("<@\(.slack_id)>") | join(" ")')
           BRANCH="${{ github.event.pull_request.base.ref }}"
           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
