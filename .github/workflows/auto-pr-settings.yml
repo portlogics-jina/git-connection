@@ -122,7 +122,6 @@ jobs:
           HEADER_TEXT="New Pull Request"
           HEADER_EMOJI=":hammer_and_wrench:"
           TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
-
           BUTTON_TEXT="지금 당장 리뷰하기"
           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
           SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@\(.slack_id)>") | join(" ")')
