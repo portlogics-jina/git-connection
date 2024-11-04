@@ -123,7 +123,7 @@ jobs:
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link) |
-                (.blocks += [{"type": "section", "text": {"type": "mrkdwn", "text": "*Comment Preview:*\n>>>\($comment)"}}])')
+                (.blocks |= .[0:3] + [{"type": "section", "text": {"type": "mrkdwn", "text": "*Comment Preview:*\n>>>\($comment)"}}] + .[3:])')
 
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
