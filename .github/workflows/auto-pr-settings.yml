@@ -27,14 +27,8 @@ jobs:
       - name: Load reviewers from reviewers.json
         id: load_reviewers
         run: |
-          REVIEWERS_FILE="reviewers.json"
-          if [ -f "$REVIEWERS_FILE" ]; then
-            echo "Reviewers file found."
-            cat "$REVIEWERS_FILE" > reviewers_data.json
-          else
-            echo "Reviewers file not found!"
-            exit 1
-          fi
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
       - name: Get branch names
         id: branch-names
@@ -81,7 +75,7 @@ jobs:
                 .selected_reviewers += [$item]
               end
             )
-          ' reviewers_data.json)
+          ' .github/workflows/reviewers.json)
           ASSIGNEE_SLACK_ID=$(echo "$RESULT" | jq -r '.assignee_slack_id')
           SELECTED_REVIEWERS=$(echo "$RESULT" | jq -c '.selected_reviewers')
           echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
@@ -120,7 +114,7 @@ jobs:
           HEADER_EMOJI=":hammer_and_wrench:"
           BUTTON_TEXT="지금 당장 리뷰하기"
           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
-          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r '"<@\(.slack_id)>"')
+          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@"+.slack_id+">") | join(", ")')
           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
 
