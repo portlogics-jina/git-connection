@@ -1,4 +1,4 @@
-name: Auto PR 
+name: Auto PR Settings
 
 on:
   pull_request:
@@ -119,9 +119,11 @@ jobs:
           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
 
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
-            jq --arg header "$HEADER_EMOJI $HEADER_TEXT" \
-              --arg button "$BUTTON_TEXT" \
+            jq --arg full_header "$FULL_HEADER" \
+              --arg button_text "$BUTTON_TEXT" \
               --arg assignee "$ASSIGNEE" \
               --arg slack_reviewers "$SLACK_REVIEWERS" \
               --arg branch "$BRANCH" \
