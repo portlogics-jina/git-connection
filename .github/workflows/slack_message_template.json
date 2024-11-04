@@ -34,13 +34,6 @@
         ]
       },
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "{{COMMENT_PREVIEW}}"
-        }
-      },
-      {
         "type": "actions",
         "elements": [
           {
