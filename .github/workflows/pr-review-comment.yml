@@ -100,6 +100,8 @@ jobs:
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
+          COMMENT_PREVIEW="${{ github.event.review.body }}"
+
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
               --arg button_text "$BUTTON_TEXT" \
@@ -109,6 +111,7 @@ jobs:
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
               --arg channel "$ASSIGNEE_DM_CHANNEL" \
+              --arg comment "$COMMENT_PREVIEW" \
               '.channel = $channel |
                 .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
@@ -116,7 +119,8 @@ jobs:
                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link) |
+                (.blocks |= .[0:3] + [{"type": "section", "text": {"type": "mrkdwn", "text": "*Comment Preview:*\n>>>\($comment)"}}] + .[3:])')
 
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
