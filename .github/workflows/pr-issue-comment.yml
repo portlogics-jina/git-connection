@@ -70,7 +70,7 @@ jobs:
       - name: Send Slack notification
         if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
-          HEADER_TEXT="New PR Comment!"
+          HEADER_TEXT="New PR Comment"
           HEADER_EMOJI=":speech_balloon:"
           SLACK_API_URL="https://slack.com/api/chat.postMessage"
 
@@ -97,7 +97,7 @@ jobs:
             jq --arg ASSIGNEE "$ASSIGNEE_SLACK_ID" --arg CHANNEL "$ASSIGNEE_DM_CHANNEL" '.[$ASSIGNEE] = $CHANNEL' "$CACHE_FILE" > temp.json && mv temp.json "$CACHE_FILE"
           fi
 
-          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT $HEADER_EMOJI"
           BUTTON_TEXT="지금 당장 확인하기"
           ASSIGNEE="<@${ASSIGNEE_SLACK_ID}>"
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
