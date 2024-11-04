@@ -12,9 +12,6 @@ permissions:
   statuses: read
   checks: read
 
-env:
-  ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-
 jobs:
   notifyIssueComment:
     if: github.event.issue.pull_request
@@ -40,6 +37,12 @@ jobs:
           else
             echo "is_self_comment=false" >> $GITHUB_OUTPUT
           fi
+      
+      - name: Load reviewers from reviewers.json
+        id: load_reviewers
+        run: |
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
       - name: Get PR author and commenter information
         if: steps.check_self_comment.outputs.is_self_comment != 'true'

@@ -12,9 +12,6 @@ permissions:
   statuses: read
   checks: read
 
-env:
-  ALL_REVIEWERS: ${{ secrets.ALL_REVIEWERS }}
-
 jobs:
   notifyApproval:
     if: github.event.review.state == 'approved'
@@ -27,6 +24,12 @@ jobs:
 
       - name: Install jq
         run: sudo apt-get install -y jq
+
+      - name: Load reviewers from reviewers.json
+        id: load_reviewers
+        run: |
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
       - name: Get PR author and reviewer information
         run: |
