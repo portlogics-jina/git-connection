@@ -1,4 +1,4 @@
-name: PR Issue Comment Notifications
+name: PR Issue Comment Test
 
 on:
   issue_comment:
