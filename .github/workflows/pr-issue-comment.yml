@@ -24,18 +24,18 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Check if self-comment
-        id: check_self_comment
-        run: |
-          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
-          COMMENTER="${{ github.actor }}"
+      # - name: Check if self-comment
+      #   id: check_self_comment
+      #   run: |
+      #     PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
+      #     COMMENTER="${{ github.actor }}"
 
-          if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
-            echo "is_self_comment=true" >> $GITHUB_OUTPUT
-            echo "Skip notification for self-comment"
-          else
-            echo "is_self_comment=false" >> $GITHUB_OUTPUT
-          fi
+      #     if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
+      #       echo "is_self_comment=true" >> $GITHUB_OUTPUT
+      #       echo "Skip notification for self-comment"
+      #     else
+      #       echo "is_self_comment=false" >> $GITHUB_OUTPUT
+      #     fi
       
       - name: Load reviewers from reviewers.json
         id: load_reviewers
@@ -44,7 +44,7 @@ jobs:
           echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
       - name: Get PR author and commenter information
-        if: steps.check_self_comment.outputs.is_self_comment != 'true'
+        # if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
           PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
           COMMENTER="${{ github.actor }}"
@@ -56,7 +56,7 @@ jobs:
           echo "REVIEWER_SLACK_ID=$COMMENTER_SLACK_ID" >> $GITHUB_ENV
 
       - name: Get PR details
-        if: steps.check_self_comment.outputs.is_self_comment != 'true'
+        # if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
           PR_TITLE=$(gh pr view ${{ github.event.issue.number }} --json title -q '.title')
           BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName -q '.headRefName')
@@ -67,7 +67,7 @@ jobs:
           echo "PR_LINK=$PR_LINK" >> $GITHUB_ENV
 
       - name: Send Slack notification
-        if: steps.check_self_comment.outputs.is_self_comment != 'true'
+        # if: steps.check_self_comment.outputs.is_self_comment != 'true'
         run: |
           HEADER_TEXT="New PR Comment"
           HEADER_EMOJI=":speech_balloon:"
