@@ -83,9 +83,15 @@ jobs:
 
       - name: Update PR title and body
         run: |
+          if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
+            echo "PR title is empty, setting to default"
+            pr_title="Default PR Title"
+          else
+            pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
+          fi
           gh pr edit ${{ github.event.pull_request.number }} \
             --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
-            --body "${{ github.event.pull_request.body }}"
+            --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
