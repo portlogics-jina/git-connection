@@ -143,4 +143,15 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          # curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          RESPONSE=$(curl -s -X POST -H "Content-type: application/json" -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            --data "$SLACK_MESSAGE" https://slack.com/api/chat.postMessage)
+
+          THREAD_TS=$(echo "$RESPONSE" | jq -r '.ts')
+
+          if [[ -z "$THREAD_TS" ]]; then
+            echo "Failed to send Slack message."
+            exit 1
+          fi
+
+          echo "::set-output name=thread_ts::$THREAD_TS"

@@ -25,6 +25,16 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
+      - name: Retrieve thread_ts
+        id: retrieve_thread_ts
+        run: |
+          THREAD_TS=$(gh run view --json "outputs" --run-id "${{ github.run_id }}" | jq -r '.outputs.thread_ts')
+          if [[ -z "$THREAD_TS" ]]; then
+            echo "No thread_ts found. Skipping."
+            exit 1
+          fi
+          echo "THREAD_TS=$THREAD_TS" >> $GITHUB_ENV
+
       - name: Load reviewers from reviewers.json
         id: load_reviewers
         run: |
@@ -76,8 +86,11 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
-            -H 'Content-type: application/json' \
-            --data "$SLACK_MESSAGE" \
-            "${{ secrets.SLACK_WEBHOOK_URL }}"
+          # curl -X POST \
+          #   -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+          #   -H 'Content-type: application/json' \
+          #   --data "$SLACK_MESSAGE" \
+          #   "${{ secrets.SLACK_WEBHOOK_URL }}"
+          
+          curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            --data "$SLACK_MESSAGE" https://slack.com/api/chat.postMessage
