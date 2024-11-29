@@ -1,0 +1,100 @@
+# Test
+name: Auto PR Creation and Approval
+
+on:
+  pull_request:
+    types: [opened]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  repository-projects: read
+  statuses: read
+  checks: read
+
+jobs:
+  handlePullRequest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Load reviewers from reviewers.json
+        id: load_reviewers
+        run: |
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
+
+      - name: Send Slack notification (PR Opened)
+        if: github.event_name == 'pull_request'
+        id: send_slack_notification
+        run: |
+          HEADER_TEXT="New Pull Request"
+          HEADER_EMOJI=":hammer_and_wrench:"
+          BUTTON_TEXT="지금 당장 리뷰하기"
+          ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
+          CHANNEL_ID="C07U5PFPNLU"
+
+          SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
+            jq --arg channel "$CHANNEL_ID" \
+              --arg full_header "$HEADER_EMOJI $HEADER_TEXT" \
+              --arg button_text "$BUTTON_TEXT" \
+              --arg pr_title "${{ github.event.pull_request.title }}" \
+              --arg pr_link "${{ github.event.pull_request.html_url }}" \
+              --arg branch "${{ github.event.pull_request.base.ref }}" \
+              '
+              .channel = $channel |
+              .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) |
+              .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) |
+              .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+              .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+              .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+
+          RESPONSE=$(curl -s -X POST -H "Content-type: application/json" -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            --data "$SLACK_MESSAGE" https://slack.com/api/chat.postMessage)
+
+          THREAD_TS=$(echo "$RESPONSE" | jq -r '.ts')
+
+          if [[ -z "$THREAD_TS" ]]; then
+            echo "Failed to send Slack message."
+            exit 1
+          fi
+
+          echo "$THREAD_TS" > thread_ts.txt
+
+      - name: Send Slack notification (PR Approved)
+        if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+        run: |
+          HEADER_TEXT="PR Approved!"
+          HEADER_EMOJI=":white_check_mark:"
+          BUTTON_TEXT="지금 당장 확인하기"
+          CHANNEL_ID="C07U5PFPNLU"
+          THREAD_TS=$(cat thread_ts.txt)
+
+          SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
+            jq --arg channel "$CHANNEL_ID" \
+              --arg thread_ts "$THREAD_TS" \
+              --arg full_header "$HEADER_EMOJI $HEADER_TEXT" \
+              --arg button_text "$BUTTON_TEXT" \
+              --arg pr_title "${{ github.event.pull_request.title }}" \
+              --arg pr_link "${{ github.event.pull_request.html_url }}" \
+              --arg branch "${{ github.event.pull_request.base.ref }}" \
+              '
+              .channel = $channel |
+              .thread_ts = $thread_ts |
+              .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) |
+              .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) |
+              .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) |
+              .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+              .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+
+          curl -X POST -H "Content-type: application/json" -H "Authorization: Bearer ${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            --data "$SLACK_MESSAGE" https://slack.com/api/chat.postMessage
