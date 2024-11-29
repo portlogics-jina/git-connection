@@ -143,4 +143,18 @@ jobs:
                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Debugging: Print SLACK_MESSAGE
+          echo "Generated Slack Message:"
+          echo "$SLACK_MESSAGE"
+
+          RESPONSE=$(curl -s -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }})
+          echo "Slack API Response: $RESPONSE"
+
+          THREAD_TS=$(echo "$RESPONSE" | jq -r '.ts')
+          echo "${{ github.event.pull_request.number }}=$THREAD_TS" >> thread_ts_map.txt
+
+      - name: Upload thread_ts_map.txt as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: thread_ts_map
+          path: thread_ts_map.txt
