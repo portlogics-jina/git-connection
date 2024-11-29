@@ -70,6 +70,19 @@ jobs:
 
           echo "$THREAD_TS" > thread_ts.txt
 
+      - name: Persist thread_ts.txt
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v3
+        with:
+          name: thread_ts
+          path: thread_ts.txt
+
+      - name: Download thread_ts.txt
+        if: github.event_name == 'pull_request_review'
+        uses: actions/download-artifact@v3
+        with:
+          name: thread_ts
+
       - name: Send Slack notification (PR Approved)
         if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
         run: |
