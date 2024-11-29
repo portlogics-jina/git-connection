@@ -25,13 +25,19 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Retrieve thread_ts from PR creation workflow
+      - name: Download thread_ts_map artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: thread_ts_map
+          path: .
+
+      - name: Retrieve thread_ts from thread_ts_map.txt
         id: retrieve_thread_ts
         run: |
           THREAD_TS=$(grep "^${{ github.event.pull_request.number }}=" thread_ts_map.txt | cut -d '=' -f 2)
 
-          if [[ -z "$THREAD_TS" ]]; then
-            echo "No thread_ts found for PR #${{ github.event.pull_request.number }}. Skipping."
+          if [[ -z "$THREAD_TS" || "$THREAD_TS" == "placeholder" ]]; then
+            echo "No valid thread_ts found for PR #${{ github.event.pull_request.number }}. Skipping."
             exit 1
           fi
 
