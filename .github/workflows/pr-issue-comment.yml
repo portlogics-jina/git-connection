@@ -102,7 +102,10 @@ jobs:
           SLACK_REVIEWERS="<@${REVIEWER_SLACK_ID}>"
 
           COMMENT_PREVIEW="${{ github.event.comment.body }}" 
-          echo "COMMENT_PREVIEW=$COMMENT_PREVIEW" >> $GITHUB_ENV
+
+          # 이미지 URL 필터링 (Markdown 링크 형식 제거)
+          CLEAN_COMMENT_PREVIEW=$(echo "$COMMENT_PREVIEW" | sed -E 's/!\[.*\]\(.*\)//g')
+          echo "COMMENT_PREVIEW=$CLEAN_COMMENT_PREVIEW" >> $GITHUB_ENV
 
           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
             jq --arg full_header "$FULL_HEADER" \
@@ -113,7 +116,7 @@ jobs:
               --arg pr_link "$PR_LINK" \
               --arg pr_title "$PR_TITLE" \
               --arg channel "$ASSIGNEE_DM_CHANNEL" \
-              --arg comment "$COMMENT_PREVIEW" \
+              --arg comment "$CLEAN_COMMENT_PREVIEW" \
               '.channel = $channel |
                 .blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
