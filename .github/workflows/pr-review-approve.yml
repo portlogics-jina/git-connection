@@ -28,7 +28,7 @@ jobs:
       - name: Retrieve thread_ts
         id: retrieve_thread_ts
         run: |
-          THREAD_TS=$(gh run view --json "outputs" --run-id "${{ github.run_id }}" | jq -r '.outputs.thread_ts')
+          THREAD_TS="${{ needs.updatePullRequest.outputs.thread_ts }}"
           if [[ -z "$THREAD_TS" ]]; then
             echo "No thread_ts found. Skipping."
             exit 1
