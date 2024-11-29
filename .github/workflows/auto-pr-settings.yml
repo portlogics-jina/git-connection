@@ -1,4 +1,4 @@
-name: Auto PR Settings
+name: PR Creation Settings
 
 on:
   pull_request:
