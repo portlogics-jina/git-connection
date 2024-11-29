@@ -161,3 +161,9 @@ jobs:
           fi
 
           echo "thread_ts=$THREAD_TS" >> $GITHUB_ENV
+
+      - name: Upload thread_ts as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: thread_ts
+          path: thread_ts.txt
