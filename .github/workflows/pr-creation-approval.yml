@@ -53,10 +53,25 @@ jobs:
           echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
           echo "labels=$LABEL_STRING" >> $GITHUB_OUTPUT
 
-      - name: Update PR title and add labels
+
+          - name: Update PR title and body
+          run: |
+            if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
+              echo "PR title is empty, setting to default"
+              pr_title="Default PR Title"
+            else
+              pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
+            fi
+            gh pr edit ${{ github.event.pull_request.number }} \
+              --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
+              --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add assignees to PR
         run: |
-          PR_TITLE="[${{ steps.branch_prefix_labels.outputs.prefix }}]: ${{ github.event.pull_request.title }}"
-          gh pr edit ${{ github.event.pull_request.number }} --title "$PR_TITLE" --add-label "${{ steps.branch_prefix_labels.outputs.labels }}"
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-assignee ${{ github.event.pull_request.user.login }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

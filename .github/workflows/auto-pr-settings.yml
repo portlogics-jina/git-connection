@@ -81,19 +81,19 @@
 #           echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
 #           echo "SELECTED_REVIEWERS=$SELECTED_REVIEWERS" >> $GITHUB_ENV
 
-#       - name: Update PR title and body
-#         run: |
-#           if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
-#             echo "PR title is empty, setting to default"
-#             pr_title="Default PR Title"
-#           else
-#             pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
-#           fi
-#           gh pr edit ${{ github.event.pull_request.number }} \
-#             --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
-#             --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
-#         env:
-#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Update PR title and body
+      #   run: |
+      #     if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
+      #       echo "PR title is empty, setting to default"
+      #       pr_title="Default PR Title"
+      #     else
+      #       pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
+      #     fi
+      #     gh pr edit ${{ github.event.pull_request.number }} \
+      #       --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
+      #       --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 #       - name: Add assignees to PR
 #         run: |
