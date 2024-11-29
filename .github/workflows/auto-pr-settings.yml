@@ -15,6 +15,8 @@ permissions:
 jobs:
   updatePullRequest:
     runs-on: ubuntu-latest
+    outputs:
+      thread_ts: ${{ steps.send_slack_notification.outputs.thread_ts }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -154,4 +156,4 @@ jobs:
             exit 1
           fi
 
-          echo "::set-output name=thread_ts::$THREAD_TS"
+          echo "thread_ts=$THREAD_TS" >> $GITHUB_ENV
