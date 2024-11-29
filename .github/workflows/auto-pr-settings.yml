@@ -1,146 +1,146 @@
-# name: Auto PR Settings
+name: Auto PR Settings
 
-# on:
-#   pull_request:
-#     types: [opened]
+on:
+  pull_request:
+    types: [opened]
 
-# permissions:
-#   contents: read
-#   pull-requests: write
-#   issues: write
-#   repository-projects: read
-#   statuses: read
-#   checks: read
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  repository-projects: read
+  statuses: read
+  checks: read
 
-# jobs:
-#   updatePullRequest:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Check out the repository
-#         uses: actions/checkout@v4
-#         with:
-#           ref: ${{ github.event.pull_request.head.ref }}
+jobs:
+  updatePullRequest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
-#       - name: Install jq
-#         run: sudo apt-get install -y jq
+      - name: Install jq
+        run: sudo apt-get install -y jq
 
-#       - name: Load reviewers from reviewers.json
-#         id: load_reviewers
-#         run: |
-#           ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
-#           echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
+      - name: Load reviewers from reviewers.json
+        id: load_reviewers
+        run: |
+          ALL_REVIEWERS=$(cat .github/workflows/reviewers.json | jq -c '.')
+          echo "ALL_REVIEWERS=$ALL_REVIEWERS" >> $GITHUB_ENV
 
-#       - name: Get branch names
-#         id: branch-names
-#         uses: tj-actions/branch-names@v8
+      - name: Get branch names
+        id: branch-names
+        uses: tj-actions/branch-names@v8
 
-#       - name: Get branch prefix
-#         id: get_branch_prefix
-#         if: steps.branch-names.outputs.is_default == 'false'
-#         run: |
-#           PREFIX=$(echo ${{ steps.branch-names.outputs.current_branch }} | awk -F'/' '{print toupper($1)}')
-#           echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
-#           echo "pr_title=[$PREFIX]: ${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
+      - name: Get branch prefix
+        id: get_branch_prefix
+        if: steps.branch-names.outputs.is_default == 'false'
+        run: |
+          PREFIX=$(echo ${{ steps.branch-names.outputs.current_branch }} | awk -F'/' '{print toupper($1)}')
+          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "pr_title=[$PREFIX]: ${{ github.event.pull_request.title }}" >> $GITHUB_OUTPUT
 
-#       - name: Determine label based on base branch
-#         id: get_label
-#         run: |
-#           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-#           PREFIX=${{ steps.get_branch_prefix.outputs.prefix }}
-#           LABELS=("$PREFIX")
+      - name: Determine label based on base branch
+        id: get_label
+        run: |
+          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
+          PREFIX=${{ steps.get_branch_prefix.outputs.prefix }}
+          LABELS=("$PREFIX")
 
-#           if [[ "$BASE_BRANCH" == "develop" ]]; then
-#             LABELS+=("Develop")
-#           elif [[ "$BASE_BRANCH" == "staging" ]]; then
-#             LABELS+=("Staging")
-#           elif [[ "$BASE_BRANCH" == "main" ]]; then
-#             LABELS+=("Main")
-#           else
-#             LABELS+=("Unknown")
-#           fi
+          if [[ "$BASE_BRANCH" == "develop" ]]; then
+            LABELS+=("Develop")
+          elif [[ "$BASE_BRANCH" == "staging" ]]; then
+            LABELS+=("Staging")
+          elif [[ "$BASE_BRANCH" == "main" ]]; then
+            LABELS+=("Main")
+          else
+            LABELS+=("Unknown")
+          fi
 
-#           LABEL_STRING=$(IFS=, ; echo "${LABELS[*]}")
-#           echo "labels=$LABEL_STRING" >> $GITHUB_OUTPUT
+          LABEL_STRING=$(IFS=, ; echo "${LABELS[*]}")
+          echo "labels=$LABEL_STRING" >> $GITHUB_OUTPUT
 
-#       - name: Select reviewers and assignee
-#         id: select_reviewers
-#         run: |
-#           ACTOR="${{ github.actor }}"
-#           RESULT=$(jq -c --arg ACTOR "$ACTOR" '
-#             reduce .[] as $item (
-#               {"assignee_slack_id": null, "selected_reviewers": []};
-#               if $item.github_username == $ACTOR then
-#                 .assignee_slack_id = $item.slack_id
-#               else
-#                 .selected_reviewers += [$item]
-#               end
-#             )
-#           ' .github/workflows/reviewers.json)
-#           ASSIGNEE_SLACK_ID=$(echo "$RESULT" | jq -r '.assignee_slack_id')
-#           SELECTED_REVIEWERS=$(echo "$RESULT" | jq -c '.selected_reviewers')
-#           echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
-#           echo "SELECTED_REVIEWERS=$SELECTED_REVIEWERS" >> $GITHUB_ENV
+      - name: Select reviewers and assignee
+        id: select_reviewers
+        run: |
+          ACTOR="${{ github.actor }}"
+          RESULT=$(jq -c --arg ACTOR "$ACTOR" '
+            reduce .[] as $item (
+              {"assignee_slack_id": null, "selected_reviewers": []};
+              if $item.github_username == $ACTOR then
+                .assignee_slack_id = $item.slack_id
+              else
+                .selected_reviewers += [$item]
+              end
+            )
+          ' .github/workflows/reviewers.json)
+          ASSIGNEE_SLACK_ID=$(echo "$RESULT" | jq -r '.assignee_slack_id')
+          SELECTED_REVIEWERS=$(echo "$RESULT" | jq -c '.selected_reviewers')
+          echo "ASSIGNEE_SLACK_ID=$ASSIGNEE_SLACK_ID" >> $GITHUB_ENV
+          echo "SELECTED_REVIEWERS=$SELECTED_REVIEWERS" >> $GITHUB_ENV
 
-#       - name: Update PR title and body
-#         run: |
-#           if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
-#             echo "PR title is empty, setting to default"
-#             pr_title="Default PR Title"
-#           else
-#             pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
-#           fi
-#           gh pr edit ${{ github.event.pull_request.number }} \
-#             --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
-#             --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
-#         env:
-#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update PR title and body
+        run: |
+          if [ -z "${{ steps.get_branch_prefix.outputs.pr_title }}" ]; then
+            echo "PR title is empty, setting to default"
+            pr_title="Default PR Title"
+          else
+            pr_title="${{ steps.get_branch_prefix.outputs.pr_title }}"
+          fi
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --title "${{ steps.get_branch_prefix.outputs.pr_title }}" \
+            --body "$(echo "${{ github.event.pull_request.body }}" | sed 's/\r//')"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-#       - name: Add assignees to PR
-#         run: |
-#           gh pr edit ${{ github.event.pull_request.number }} \
-#             --add-assignee ${{ github.event.pull_request.user.login }}
-#         env:
-#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add assignees to PR
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-assignee ${{ github.event.pull_request.user.login }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-#       - name: Add reviewers to PR
-#         run: |
-#           TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
-#           if [ "$TARGET_BRANCH" == "main" ]; then
-#             echo "Skipping reviewer assignment because target branch is $TARGET_BRANCH."
-#           else
-#             REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map(.github_username) | join(",")')
-#             gh pr edit ${{ github.event.pull_request.number }} --add-reviewer "$REVIEWERS"
-#           fi
-#         env:
-#           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Add reviewers to PR
+        run: |
+          TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          if [ "$TARGET_BRANCH" == "main" ]; then
+            echo "Skipping reviewer assignment because target branch is $TARGET_BRANCH."
+          else
+            REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map(.github_username) | join(",")')
+            gh pr edit ${{ github.event.pull_request.number }} --add-reviewer "$REVIEWERS"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-#       - name: Send Slack notification
-#         run: |
-#           HEADER_TEXT="New Pull Request"
-#           HEADER_EMOJI=":hammer_and_wrench:"
-#           BUTTON_TEXT="지금 당장 리뷰하기"
-#           ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
-#           SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@"+.slack_id+">") | join(", ")')
-#           BRANCH="${{ github.event.pull_request.base.ref }}"
-#           PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
-#           PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+      - name: Send Slack notification
+        run: |
+          HEADER_TEXT="New Pull Request"
+          HEADER_EMOJI=":hammer_and_wrench:"
+          BUTTON_TEXT="지금 당장 리뷰하기"
+          ASSIGNEE="<@${{ env.ASSIGNEE_SLACK_ID }}>"
+          SLACK_REVIEWERS=$(echo '${{ env.SELECTED_REVIEWERS }}' | jq -r 'map("<@"+.slack_id+">") | join(", ")')
+          BRANCH="${{ github.event.pull_request.base.ref }}"
+          PR_TITLE="${{ steps.get_branch_prefix.outputs.pr_title }} #${{ github.event.pull_request.number }}"
+          PR_LINK="https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
 
-#           FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
+          FULL_HEADER="$HEADER_EMOJI $HEADER_TEXT"
 
-#           SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
-#             jq --arg full_header "$FULL_HEADER" \
-#               --arg button_text "$BUTTON_TEXT" \
-#               --arg assignee "$ASSIGNEE" \
-#               --arg slack_reviewers "$SLACK_REVIEWERS" \
-#               --arg branch "$BRANCH" \
-#               --arg pr_link "$PR_LINK" \
-#               --arg pr_title "$PR_TITLE" \
-#               '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
-#                 .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
-#                 .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
-#                 .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
-#                 .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
-#                 .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
-#                 .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
+          SLACK_MESSAGE=$(cat .github/workflows/slack_message_template.json | \
+            jq --arg full_header "$FULL_HEADER" \
+              --arg button_text "$BUTTON_TEXT" \
+              --arg assignee "$ASSIGNEE" \
+              --arg slack_reviewers "$SLACK_REVIEWERS" \
+              --arg branch "$BRANCH" \
+              --arg pr_link "$PR_LINK" \
+              --arg pr_title "$PR_TITLE" \
+              '.blocks[0].text.text |= sub("{{HEADER}}"; $full_header) | 
+                .blocks[1].fields[0].text |= sub("{{ASSIGNEE}}"; $assignee) | 
+                .blocks[1].fields[1].text |= sub("{{SLACK_REVIEWERS}}"; $slack_reviewers) | 
+                .blocks[2].fields[0].text |= sub("{{PR_TITLE}}"; $pr_title) | 
+                .blocks[2].fields[1].text |= sub("{{BRANCH}}"; $branch) | 
+                .blocks[3].elements[0].text.text |= sub("{{BUTTON_TEXT}}"; $button_text) |
+                .blocks[3].elements[0].url |= sub("{{PR_LINK}}"; $pr_link)')
 
-#           curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
+          curl -X POST -H 'Content-type: application/json' --data "$SLACK_MESSAGE" ${{ secrets.SLACK_WEBHOOK_URL }}
