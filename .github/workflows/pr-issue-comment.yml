@@ -22,21 +22,23 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
+      - name: Check if self-comment
+        id: check_self_comment
+        run: |
+          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
+          COMMENTER="${{ github.actor }}"
+
+          if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
+            echo "is_self_comment=true" >> $GITHUB_OUTPUT
+            echo "Skip notification for self-comment"
+            exit 78
+          else
+            echo "is_self_comment=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      # - name: Check if self-comment
-      #   id: check_self_comment
-      #   run: |
-      #     PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
-      #     COMMENTER="${{ github.actor }}"
-
-      #     if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
-      #       echo "is_self_comment=true" >> $GITHUB_OUTPUT
-      #       echo "Skip notification for self-comment"
-      #     else
-      #       echo "is_self_comment=false" >> $GITHUB_OUTPUT
-      #     fi
       
       - name: Load reviewers from reviewers.json
         id: load_reviewers
