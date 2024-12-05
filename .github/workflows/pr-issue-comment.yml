@@ -26,7 +26,6 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      # 자기 자신의 코멘트는 알림을 보내지 않음, exit 0으로 불필요한 작업 중단
       - name: Install jq
         run: sudo apt-get install -y jq
       
