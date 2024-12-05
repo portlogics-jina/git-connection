@@ -32,7 +32,7 @@ jobs:
           if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
             echo "is_self_comment=true" >> $GITHUB_OUTPUT
             echo "Skip notification for self-comment"
-            exit 78
+            exit 0
           else
             echo "is_self_comment=false" >> $GITHUB_OUTPUT
           fi
