@@ -22,6 +22,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
+      # 자기 자신의 코멘트는 알림을 보내지 않음, exit 78로 불필요한 작업 중단
       - name: Check if self-comment
         id: check_self_comment
         run: |
@@ -31,7 +32,7 @@ jobs:
           if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
             echo "is_self_comment=true" >> $GITHUB_OUTPUT
             echo "Skip notification for self-comment"
-            exit 78
+            exit 0
           else
             echo "is_self_comment=false" >> $GITHUB_OUTPUT
           fi
