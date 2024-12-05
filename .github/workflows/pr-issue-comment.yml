@@ -15,6 +15,10 @@ permissions:
 
 jobs:
   notifyIssueComment:
+    if: |
+      github.event.issue.pull_request &&
+      toJSON(github.event.issue.user.login) != toJSON(github.actor) &&
+      github.actor != 'vercel[bot]'
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -22,24 +26,9 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      # 자기 자신의 코멘트는 알림을 보내지 않음, exit 78로 불필요한 작업 중단
-      - name: Check if self-comment
-        id: check_self_comment
-        run: |
-          PR_AUTHOR=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}" --jq '.user.login')
-          COMMENTER="${{ github.actor }}"
-
-          if [[ "$PR_AUTHOR" == "$COMMENTER" ]]; then
-            echo "is_self_comment=true" >> $GITHUB_OUTPUT
-            echo "Skip notification for self-comment"
-            exit 0
-          else
-            echo "is_self_comment=false" >> $GITHUB_OUTPUT
-          fi
-
+      # 자기 자신의 코멘트는 알림을 보내지 않음, exit 0으로 불필요한 작업 중단
       - name: Install jq
         run: sudo apt-get install -y jq
-
       
       - name: Load reviewers from reviewers.json
         id: load_reviewers
